@@ -1,0 +1,22 @@
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+
+def start(update, context):
+    update.message.reply_text("Ciao! Suggerisci una canzone scrivendo il titolo e l'artista.")
+
+def handle_suggestion(update, context):
+    song_suggestion = update.message.text
+    # Logica per ottenere informazioni sulla canzone
+    song_info = get_song_info(song_suggestion)
+    update.message.reply_text(f"Grazie! Ecco le informazioni sulla canzone: {song_info}")
+
+def main():
+    updater = Updater("token_privato", use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_suggestion))
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
