@@ -1,0 +1,105 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+from selenium.webdriver import Chrome
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from time import sleep  # Importa la funzione sleep
+from selenium.common.exceptions import NoSuchElementException
+from pandas import read_csv
+from urllib.parse import urlparse, urlunparse
+
+# Definisci una funzione per rimuovere la sottostringa "/intl-it" dall'URL
+def rimuovi_sottostringa_intl_it(link):
+    parsed_url = urlparse(link)
+    path_parts = parsed_url.path.split('/')
+    if 'intl-it' in path_parts:
+        path_parts.remove('intl-it')
+        parsed_url = parsed_url._replace(path='/'.join(path_parts))
+        return urlunparse(parsed_url)
+    else:
+        return link
+
+#Capisce dall'url se è una traccia o un album
+def get_spotify_type(url):
+    if "/album/" in url:
+        return "Album"
+    elif "/track/" in url:
+        return "Traccia"
+    else:
+        return "Tipo non riconosciuto"
+
+#link del sito
+SONGDATA_LINK = "https://songdata.io/"
+
+#Lettura file CSV input
+df = read_csv('preparazione_serata.csv', index_col=0, encoding='utf-8')
+
+#apertura di chrome
+chrome_driver = ChromeDriverManager().install()
+driver = Chrome(service=Service(chrome_driver))
+driver.maximize_window()
+
+for Link in df.index:
+    sleep(1)
+    driver.get(SONGDATA_LINK)
+    link_modificato = rimuovi_sottostringa_intl_it(Link)
+    if get_spotify_type(link_modificato) == 'Traccia':
+
+        driver.find_element(By.ID, 'query').send_keys(link_modificato)
+        sleep(1)  # Aggiungi un ritardo di 2 secondi
+        driver.find_element(By.ID, 'stat_search').click()
+        sleep(1)
+
+        # Trova l'elemento div con id 'h1', che dovrebbe contenere il titolo della canzone
+        try:
+            Track = driver.find_element(By.XPATH, "//*[@id='h1']")
+        except NoSuchElementException:
+            Track = "N/A"
+
+        # Trova l'elemento div che contiene l'artista della canzone
+        try:
+            Artist = driver.find_element(By.XPATH, "//*[@id='track-info-pane']/div/div[2]/div[2]")
+        except NoSuchElementException:
+            Artist = "N/A"
+
+        # Trova l'elemento div che contiene la chiave
+        try:
+            key_element = driver.find_element(By.XPATH, "//*[@id='track-info-pane']/div/div[2]/dl/div[2]/dd")
+            key_value = key_element.text
+        except NoSuchElementException:
+            key_value = "N/A"
+
+        # Trova l'elemento div che contiene Camelot
+        try:
+            camelot_element = driver.find_element(By.XPATH, "//*[@id='track-info-pane']/div/div[2]/dl/div[3]/dd")
+            camelot_value = camelot_element.text
+        except NoSuchElementException:
+            camelot_value = "N/A"
+
+            # Trova l'elemento div che contiene i BPM
+        try:
+            bpm_element = driver.find_element(By.XPATH, "//*[@id='track-info-pane']/div/div[2]/dl/div[1]/dd")
+            bpm_value = bpm_element.text
+        except NoSuchElementException:
+            bpm_value = "N/A"
+
+        # Stampa il testo dell'elemento trovato, che presumibilmente è il titolo della canzone o playlist
+        df.loc[Link, 'Track'] = str(Track.text)
+        print(Track.text)
+        df.loc[Link, 'Artist'] = str(Artist.text)
+        print(Artist.text)
+        df.loc[Link, 'Key'] = str(key_value)
+        print(key_value)
+        df.loc[Link, 'Camelot'] = str(camelot_value)
+        print(camelot_value)
+        df.loc[Link, 'BPM'] = str(bpm_value)
+        print(bpm_value)
+    
+    if get_spotify_type(link_modificato) == 'Album':
+        print('è un album')
+
+
+df.to_csv('preparazione_serata_compilata.csv')
+
+
